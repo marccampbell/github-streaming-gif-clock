@@ -10,14 +10,14 @@ from PIL import Image, ImageDraw, ImageFont
 WIDTH, HEIGHT = 480, 120
 PALETTE = [15, 23, 42, 74, 222, 128, 226, 232, 240] + [0] * (768 - 9)
 
-def frame(sequence):
+def frame(sequence, label='LIVE'):
     im = Image.new('P', (WIDTH, HEIGHT), 0)
     im.putpalette(PALETTE)
     draw = ImageDraw.Draw(im)
     font = ImageFont.load_default(size=27)
     now = datetime.now(timezone.utc).strftime('%H:%M:%S UTC')
     draw.text((18, 12), now, fill=1, font=font)
-    draw.text((18, 52), f'LIVE frame {sequence}', fill=2, font=font)
+    draw.text((18, 52), f'{label} frame {sequence}', fill=2, font=font)
     draw.rectangle((18, 100, 18 + sequence % 440, 107), fill=1)
     out = io.BytesIO()
     im.save(out, format='GIF', duration=1000, optimize=False)
@@ -30,6 +30,17 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
 
     def do_GET(self):
+        if urlsplit(self.path).path == '/control.gif':
+            header, content = frame(0, 'CONTROL')
+            body = header + b'!\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00' + content
+            body += b''.join(frame(i, 'CONTROL')[1] for i in range(1, 5)) + b';'
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/gif')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'no-store')
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if urlsplit(self.path).path != '/clock.gif':
             body = b'<html><body><h1>Streaming GIF clock</h1><p>One new server-generated frame per second.</p><img src="/clock.gif?direct=1"></body></html>'
             self.send_response(200)
