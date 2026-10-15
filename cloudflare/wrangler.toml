@@ -1,0 +1,20 @@
+name = "github-gif-clock"
+account_id = "9bc43dd1cc5fcf2d0f8ea7a88f917ea5"
+main = "worker.mjs"
+compatibility_date = "2026-10-15"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "CLOCK_BUCKET"
+bucket_name = "github-clock-experiment"
+
+[[durable_objects.bindings]]
+name = "CLOCK"
+class_name = "Clock"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Clock"]
+
+[triggers]
+crons = ["* * * * *"]
