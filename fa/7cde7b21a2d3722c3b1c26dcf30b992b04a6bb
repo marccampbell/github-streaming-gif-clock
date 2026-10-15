@@ -1,0 +1,21 @@
+cloudflare/wrangler.toml
+  s_ef2c4c51d1725f::t_459e2083e763a3 7-11
+cloudflare/worker.mjs
+  s_ef2c4c51d1725f::t_459e2083e763a3 11,24-46,51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fa7cde7b21a2d3722c3b1c26dcf30b992b04a6bb",
+  "prompts": {},
+  "sessions": {
+    "s_ef2c4c51d1725f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13b34-bb21-74b3-8619-976009fcbefe",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Marc Campbell <marc.e.campbell@gmail.com>"
+    }
+  }
+}
