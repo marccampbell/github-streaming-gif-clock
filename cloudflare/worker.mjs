@@ -42,7 +42,7 @@ async function updateComment(env) {
   const now=Date.now();
   if(now<(status.nextAttempt??0)) return;
   const image=`${env.PUBLIC_R2_URL}/clock.gif?v=${Math.floor(now/1000)}`;
-  const body=`<table><tr><td width="282" height="96"><img src="${image}" width="256" height="72" alt="Clock"></td></tr></table>`;
+  const body=`<table align="center"><tr><td width="506" height="192" align="center"><img src="${image}" width="480" height="168" alt="Clock"></td></tr></table>`;
   const headers={Authorization:`Bearer ${env.GITHUB_TOKEN}`,'User-Agent':'github-gif-clock','Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'};
   // Resolve and warm the exact Camo URL before viewers see the new comment.
   // Never forward the GitHub credential to the image proxy.
@@ -69,7 +69,7 @@ async function updateComment(env) {
   try {payload=JSON.parse(responseText);}
   catch {payload={message:responseText.slice(0,200).replace(/github_pat_[A-Za-z0-9_]+/g,'[redacted]')};}
   const next=response.ok
-    ?{lastCommentUpdate:now,nextAttempt:now+9000,proxyWarmedAt:warmedAt,proxyWarmupMs:warmedAt-now}
+    ?{lastCommentUpdate:now,nextAttempt:now+14000,proxyWarmedAt:warmedAt,proxyWarmupMs:warmedAt-now}
     :{...status,lastError:`GitHub returned ${response.status}: ${payload.message}`,requiredPermissions:response.headers.get('x-accepted-github-permissions'),nextAttempt:now+Math.max(60000,Number(response.headers.get('retry-after')??0)*1000)};
   await env.CLOCK_BUCKET.put('comment-status.json',JSON.stringify(next),{httpMetadata:{contentType:'application/json',cacheControl:'no-store'}});
 }
@@ -80,8 +80,8 @@ export default {
     await clock(env).fetch('https://clock.internal/status');
     // Each scheduled invocation is bounded; Cloudflare starts a new one each minute.
     const started=Date.now();
-    for(let i=0;i<6;i++) {
-      const delay=started+i*10000-Date.now();
+    for(let i=0;i<4;i++) {
+      const delay=started+i*15000-Date.now();
       if(delay>0) await new Promise(resolve=>setTimeout(resolve,delay));
       await updateComment(env);
     }
@@ -121,7 +121,7 @@ export default {
       });
       return new Response(stream,{headers:{'Content-Type':'image/gif','Cache-Control':'no-store, no-cache, no-transform','X-Content-Type-Options':'nosniff'}});
     }
-    if(path==='/') return new Response('<!doctype html><meta charset="utf-8"><title>Clock</title><style>body{background:#0f172a;display:grid;place-items:center;min-height:90vh}img{width:768px;max-width:100%;image-rendering:pixelated}</style><img src="/stream.gif" alt="Live UTC clock">',{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
+    if(path==='/') return new Response('<!doctype html><meta charset="utf-8"><title>Clock</title><style>body{background:#0f172a;display:grid;place-items:center;min-height:90vh}img{width:480px;max-width:100%}</style><img src="/stream.gif" alt="Live Pacific clock">',{headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
     return new Response('Not found',{status:404});
   }
 };
