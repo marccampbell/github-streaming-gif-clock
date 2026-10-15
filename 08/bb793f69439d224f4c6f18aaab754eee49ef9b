@@ -1,0 +1,26 @@
+cloudflare/worker.mjs
+  s_ef2c4c51d1725f::t_c10fe42ba6f7bc 11,29-32
+  s_ef2c4c51d1725f::t_28804fa4c7ce44 28,38-49,54,57-58,64,76-77
+  s_ef2c4c51d1725f::t_b2d2be0930b8dc 56
+  s_ef2c4c51d1725f::t_a4ec73df5ed8e0 63,65-68
+  s_ef2c4c51d1725f::t_67aee7c7060ea9 73-75,78
+  s_ef2c4c51d1725f::t_d371b4921ddca2 50-53
+  s_ef2c4c51d1725f::t_5608a88ce59135 55
+  s_ef2c4c51d1725f::t_4afb4518ea93f5 59
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "08bb793f69439d224f4c6f18aaab754eee49ef9b",
+  "prompts": {},
+  "sessions": {
+    "s_ef2c4c51d1725f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13b34-bb21-74b3-8619-976009fcbefe",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Marc Campbell <marc.e.campbell@gmail.com>"
+    }
+  }
+}
