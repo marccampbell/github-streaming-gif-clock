@@ -42,19 +42,34 @@ async function updateComment(env) {
   const now=Date.now();
   if(now<(status.nextAttempt??0)) return;
   const image=`${env.PUBLIC_R2_URL}/clock.gif?v=${Math.floor(now/1000)}`;
+  const body=`<table><tr><td width="282" height="96"><img src="${image}" width="256" height="72" alt="Clock"></td></tr></table>`;
+  const headers={Authorization:`Bearer ${env.GITHUB_TOKEN}`,'User-Agent':'github-gif-clock','Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'};
+  // Resolve and warm the exact Camo URL before viewers see the new comment.
+  // Never forward the GitHub credential to the image proxy.
+  const preview=await fetch('https://api.github.com/markdown',{
+    method:'POST',headers,body:JSON.stringify({text:body,mode:'gfm'})
+  });
+  if(!preview.ok) throw new Error(`GitHub image preview returned ${preview.status}`);
+  const html=await preview.text();
+  const camo=html.match(/src="(https:\/\/camo\.githubusercontent\.com\/[^\"]+)"/)?.[1];
+  if(!camo) throw new Error('GitHub image proxy URL missing');
+  const warmed=await fetch(camo,{headers:{'User-Agent':'github-gif-clock'}});
+  if(!warmed.ok) throw new Error(`GitHub image warmup returned ${warmed.status}`);
+  await warmed.arrayBuffer();
+  const warmedAt=Date.now();
   const response=await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/issues/comments/${env.GITHUB_COMMENT_ID}`,{
     method:'PATCH',
-    headers:{Authorization:`Bearer ${env.GITHUB_TOKEN}`,'User-Agent':'github-gif-clock','Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},
+    headers,
     // GitHub's animated-image wrapper can hide the image during replacement.
     // Reserve space outside that wrapper so the comment cannot collapse then.
-    body:JSON.stringify({body:`<table><tr><td width="282" height="96"><img src="${image}" width="256" height="72" alt="Clock"></td></tr></table>`})
+    body:JSON.stringify({body})
   });
   const responseText=await response.text();
   let payload;
   try {payload=JSON.parse(responseText);}
   catch {payload={message:responseText.slice(0,200).replace(/github_pat_[A-Za-z0-9_]+/g,'[redacted]')};}
   const next=response.ok
-    ?{lastCommentUpdate:now,nextAttempt:now+9000}
+    ?{lastCommentUpdate:now,nextAttempt:now+9000,proxyWarmedAt:warmedAt,proxyWarmupMs:warmedAt-now}
     :{...status,lastError:`GitHub returned ${response.status}: ${payload.message}`,requiredPermissions:response.headers.get('x-accepted-github-permissions'),nextAttempt:now+Math.max(60000,Number(response.headers.get('retry-after')??0)*1000)};
   await env.CLOCK_BUCKET.put('comment-status.json',JSON.stringify(next),{httpMetadata:{contentType:'application/json',cacheControl:'no-store'}});
 }
