@@ -17,8 +17,9 @@ This is a protocol experiment, not production hosting.
 
 ## Versioned clips
 
-Run `python publish_clock.py --updates 20 --interval 30` with authenticated `gh`.
-It publishes 30-second, non-looping clock clips to a separate assets branch,
-then edits the existing PR comment to reference each immutable commit URL.
-The test lasts ten minutes; completed clips remain hosted on GitHub.
+Run `python publish_clock.py --base-url https://YOUR-TUNNEL --updates 20 --interval 30`
+with authenticated `gh` and the clock server running through an HTTPS tunnel.
+It saves 30-second, non-looping clock clips locally outside Git, then edits the
+existing PR comment to reference a unique hosted URL for each clip.
+The test lasts ten minutes. The temporary host must stay online to serve clips.
 Clock times are calculated in advance, not recordings of future execution state.

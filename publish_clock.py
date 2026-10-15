@@ -1,24 +1,16 @@
 """Publish finite clock clips and rotate one PR comment for a bounded test."""
 import argparse
-import base64
 import io
 import json
 import subprocess
 import time
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 from PIL import Image, ImageDraw, ImageFont
 
 REPO = 'marccampbell/github-streaming-gif-clock'
 COMMENT = '6173052044'
-
-def api(path, payload=None):
-    command = ['gh', 'api', path]
-    if payload is not None:
-        command += ['--method', 'POST' if '/git/refs' in path else 'PUT', '--input', '-']
-    result = subprocess.run(command, input=json.dumps(payload) if payload is not None else None,
-                            text=True, capture_output=True, check=True)
-    return json.loads(result.stdout)
 
 def clip(start, seconds):
     frames = []
@@ -41,22 +33,16 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--updates', type=int, default=20)
     parser.add_argument('--interval', type=int, default=30)
+    parser.add_argument('--base-url', required=True)
     args = parser.parse_args()
-    initial = api(f'repos/{REPO}/git/ref/heads/streaming-clock')['object']['sha']
-    branch = 'clock-clips-' + datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')
-    api(f'repos/{REPO}/git/refs', {'ref': 'refs/heads/' + branch, 'sha': initial})
-    previous = None
+    directory = Path(__file__).parent / 'clips'
+    directory.mkdir(exist_ok=True)
     for revision in range(1, args.updates + 1):
         began = time.monotonic()
         now = datetime.now(timezone.utc).replace(microsecond=0)
-        payload = {'message': f'Clock clip {revision}: {now.isoformat()}',
-                   'content': base64.b64encode(clip(now, args.interval)).decode(), 'branch': branch}
-        if previous:
-            payload['sha'] = previous
-        saved = api(f'repos/{REPO}/contents/clock.gif', payload)
-        previous = saved['content']['sha']
-        commit = saved['commit']['sha']
-        url = f'https://raw.githubusercontent.com/{REPO}/{commit}/clock.gif'
+        name = now.strftime('%Y%m%dT%H%M%SZ') + f'-{revision}.gif'
+        (directory / name).write_bytes(clip(now, args.interval))
+        url = args.base_url.rstrip('/') + '/clips/' + name
         body = f'''## Versioned clock GIF experiment
 
 ![Clock clip revision {revision}]({url})
@@ -67,7 +53,7 @@ Every {args.interval} seconds this same comment switches to a new, immutable GIF
 
 Leave this page open. If the revision and image change together without refreshing, GitHub supports the proposed update mechanism. If they stay unchanged, reload to see the latest revision and compare.
 
-This is a bounded {args.updates * args.interval // 60}-minute experiment. After revision {args.updates}, automatic updates stop. GIF files remain hosted in this repository.
+This is a bounded {args.updates * args.interval // 60}-minute experiment. After revision {args.updates}, automatic updates stop. GIFs are served outside GitHub through a temporary HTTPS tunnel; they depend on this host staying online.
 '''
         subprocess.run(['gh', 'api', f'repos/{REPO}/issues/comments/{COMMENT}',
                         '--method', 'PATCH', '--input', '-'],

@@ -2,6 +2,8 @@
 import io
 import time
 import uuid
+import re
+from pathlib import Path
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
@@ -30,6 +32,21 @@ class Handler(BaseHTTPRequestHandler):
     protocol_version = 'HTTP/1.1'
 
     def do_GET(self):
+        path = urlsplit(self.path).path
+        if path.startswith('/clips/'):
+            name = path.removeprefix('/clips/')
+            file = Path(__file__).parent / 'clips' / name
+            if not re.fullmatch(r'[A-Za-z0-9-]+\.gif', name) or not file.is_file():
+                self.send_error(404)
+                return
+            body = file.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/gif')
+            self.send_header('Content-Length', str(len(body)))
+            self.send_header('Cache-Control', 'public, max-age=31536000, immutable')
+            self.end_headers()
+            self.wfile.write(body)
+            return
         if urlsplit(self.path).path == '/control.gif':
             header, content = frame(0, 'CONTROL')
             body = header + b'!\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00' + content
