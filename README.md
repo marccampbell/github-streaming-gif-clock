@@ -14,3 +14,11 @@ disconnects. Try a second browser and a background tab.
 
 The test tunnel is temporary and depends on the host process staying alive.
 This is a protocol experiment, not production hosting.
+
+## Versioned clips
+
+Run `python publish_clock.py --updates 20 --interval 30` with authenticated `gh`.
+It publishes 30-second, non-looping clock clips to a separate assets branch,
+then edits the existing PR comment to reference each immutable commit URL.
+The test lasts ten minutes; completed clips remain hosted on GitHub.
+Clock times are calculated in advance, not recordings of future execution state.
