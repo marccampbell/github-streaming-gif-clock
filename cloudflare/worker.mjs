@@ -8,7 +8,7 @@ export class Clock extends DurableObject {
       await this.ctx.storage.setAlarm(Date.now()+1000);
       await this.publish();
     }
-    return Response.json({now:new Date().toISOString(),lastPublished:await this.ctx.storage.get('lastPublished'),nextAlarm:await this.ctx.storage.getAlarm()});
+    return Response.json({now:new Date().toISOString(),lastPublished:await this.ctx.storage.get('lastPublished'),nextAlarm:await this.ctx.storage.getAlarm(),githubUpdatesEnabled:Boolean(this.env.GITHUB_TOKEN),lastCommentUpdate:await this.ctx.storage.get('lastCommentUpdate')});
   }
   async publish() {
     const now=Math.floor(Date.now()/1000)*1000;
@@ -21,11 +21,34 @@ export class Clock extends DurableObject {
     });
     await this.ctx.storage.put('lastPublished',now);
   }
+  async updateComment() {
+    if(!this.env.GITHUB_TOKEN) return;
+    const now=Date.now();
+    if(now<(await this.ctx.storage.get('nextCommentAttempt')??0)) return;
+    // Each URL gives GitHub a new cache key. The only comment content remains
+    // the GIF, and GitHub access is restricted by the supplied token's scope.
+    await this.ctx.storage.put('nextCommentAttempt',now+30000);
+    const revision=Math.floor(now/1000);
+    const image=`${this.env.PUBLIC_R2_URL}/clock.gif?v=${revision}`;
+    const response=await fetch(`https://api.github.com/repos/${this.env.GITHUB_REPOSITORY}/issues/comments/${this.env.GITHUB_COMMENT_ID}`,{
+      method:'PATCH',
+      headers:{Authorization:`Bearer ${this.env.GITHUB_TOKEN}`,'User-Agent':'github-gif-clock','Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},
+      body:JSON.stringify({body:`![Clock](${image})`})
+    });
+    if(!response.ok) {
+      const retryAfter=Number(response.headers.get('retry-after'));
+      await this.ctx.storage.put('nextCommentAttempt',now+Math.max(60000,Number.isFinite(retryAfter)?retryAfter*1000:0));
+      await response.body?.cancel();
+      throw new Error(`GitHub comment update returned ${response.status}`);
+    }
+    await response.body?.cancel();
+    await this.ctx.storage.put('lastCommentUpdate',now);
+  }
   async alarm() {
     // Persist the next wakeup before doing I/O. An outage cannot permanently
     // exhaust alarm retries and stop the clock. Never write a key faster than 1 Hz.
     await this.ctx.storage.setAlarm(Date.now()+1000);
-    try { await this.publish(); }
+    try { await this.publish(); await this.updateComment(); }
     catch(error) { console.error('Clock publication failed',String(error)); }
   }
 }
