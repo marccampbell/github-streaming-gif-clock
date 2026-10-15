@@ -24,7 +24,7 @@ export class Clock extends DurableObject {
   async alarm() {
     // Persist the next wakeup before doing I/O. An outage cannot permanently
     // exhaust alarm retries and stop the clock. Never write a key faster than 1 Hz.
-    await this.ctx.storage.setAlarm(Date.now()+1100);
+    await this.ctx.storage.setAlarm(Date.now()+1000);
     try { await this.publish(); }
     catch(error) { console.error('Clock publication failed',String(error)); }
   }
