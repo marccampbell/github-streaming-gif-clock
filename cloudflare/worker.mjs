@@ -45,8 +45,9 @@ async function updateComment(env) {
   const response=await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/issues/comments/${env.GITHUB_COMMENT_ID}`,{
     method:'PATCH',
     headers:{Authorization:`Bearer ${env.GITHUB_TOKEN}`,'User-Agent':'github-gif-clock','Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},
-    // Reserve the GIF's space before its new cache URL finishes loading.
-    body:JSON.stringify({body:`<img src="${image}" width="256" height="72" alt="Clock">`})
+    // GitHub's animated-image wrapper can hide the image during replacement.
+    // Reserve space outside that wrapper so the comment cannot collapse then.
+    body:JSON.stringify({body:`<table><tr><td width="282" height="88"><img src="${image}" width="256" height="72" alt="Clock"></td></tr></table>`})
   });
   const responseText=await response.text();
   let payload;
