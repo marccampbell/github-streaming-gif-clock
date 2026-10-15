@@ -1,0 +1,19 @@
+cloudflare/worker.mjs
+  s_ef2c4c51d1725f::t_c842dfb75cdcfa 45-59,62,65,72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a52cae1c2c44bc7300e7b18ec97890db81418928",
+  "prompts": {},
+  "sessions": {
+    "s_ef2c4c51d1725f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13b34-bb21-74b3-8619-976009fcbefe",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Marc Campbell <marc.e.campbell@gmail.com>"
+    }
+  }
+}
