@@ -1,0 +1,25 @@
+name = "github-gif-clock"
+account_id = "9bc43dd1cc5fcf2d0f8ea7a88f917ea5"
+main = "worker.mjs"
+compatibility_date = "2026-10-15"
+workers_dev = true
+
+[vars]
+PUBLIC_R2_URL = "https://pub-4021b2b2cf124102b8d1643d5a0bde07.r2.dev"
+GITHUB_REPOSITORY = "marccampbell/github-streaming-gif-clock"
+GITHUB_COMMENT_ID = "6195058448"
+
+[[r2_buckets]]
+binding = "CLOCK_BUCKET"
+bucket_name = "github-clock-experiment"
+
+[[durable_objects.bindings]]
+name = "CLOCK"
+class_name = "Clock"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Clock"]
+
+[triggers]
+crons = ["* * * * *"]
