@@ -62,8 +62,10 @@ export default {
     // Watchdog: rearm if an alarm disappears. Does not depend on any viewers.
     await clock(env).fetch('https://clock.internal/status');
     // Each scheduled invocation is bounded; Cloudflare starts a new one each minute.
+    const started=Date.now();
     for(let i=0;i<6;i++) {
-      if(i) await new Promise(resolve=>setTimeout(resolve,10000));
+      const delay=started+i*10000-Date.now();
+      if(delay>0) await new Promise(resolve=>setTimeout(resolve,delay));
       await updateComment(env);
     }
   },
