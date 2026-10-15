@@ -8,7 +8,7 @@ export class Clock extends DurableObject {
       await this.ctx.storage.setAlarm(Date.now()+1000);
       await this.publish();
     }
-    return Response.json({now:new Date().toISOString(),lastPublished:await this.ctx.storage.get('lastPublished'),nextAlarm:await this.ctx.storage.getAlarm(),githubUpdatesEnabled:Boolean(this.env.GITHUB_TOKEN),lastCommentUpdate:await this.ctx.storage.get('lastCommentUpdate')});
+    return Response.json({now:new Date().toISOString(),lastPublished:await this.ctx.storage.get('lastPublished'),nextAlarm:await this.ctx.storage.getAlarm(),githubUpdatesEnabled:Boolean(this.env.GITHUB_TOKEN),lastCommentUpdate:await this.ctx.storage.get('lastCommentUpdate'),lastError:await this.ctx.storage.get('lastError'),clockRevision:'secret-enabled-v1'});
   }
   async publish() {
     const now=Math.floor(Date.now()/1000)*1000;
@@ -21,49 +21,61 @@ export class Clock extends DurableObject {
     });
     await this.ctx.storage.put('lastPublished',now);
   }
-  async updateComment() {
-    if(!this.env.GITHUB_TOKEN) return;
-    const now=Date.now();
-    if(now<(await this.ctx.storage.get('nextCommentAttempt')??0)) return;
-    // Each URL gives GitHub a new cache key. The only comment content remains
-    // the GIF, and GitHub access is restricted by the supplied token's scope.
-    await this.ctx.storage.put('nextCommentAttempt',now+30000);
-    const revision=Math.floor(now/1000);
-    const image=`${this.env.PUBLIC_R2_URL}/clock.gif?v=${revision}`;
-    const response=await fetch(`https://api.github.com/repos/${this.env.GITHUB_REPOSITORY}/issues/comments/${this.env.GITHUB_COMMENT_ID}`,{
-      method:'PATCH',
-      headers:{Authorization:`Bearer ${this.env.GITHUB_TOKEN}`,'User-Agent':'github-gif-clock','Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},
-      body:JSON.stringify({body:`![Clock](${image})`})
-    });
-    if(!response.ok) {
-      const retryAfter=Number(response.headers.get('retry-after'));
-      await this.ctx.storage.put('nextCommentAttempt',now+Math.max(60000,Number.isFinite(retryAfter)?retryAfter*1000:0));
-      await response.body?.cancel();
-      throw new Error(`GitHub comment update returned ${response.status}`);
-    }
-    await response.body?.cancel();
-    await this.ctx.storage.put('lastCommentUpdate',now);
-  }
   async alarm() {
     // Persist the next wakeup before doing I/O. An outage cannot permanently
     // exhaust alarm retries and stop the clock. Never write a key faster than 1 Hz.
     await this.ctx.storage.setAlarm(Date.now()+1000);
-    try { await this.publish(); await this.updateComment(); }
-    catch(error) { console.error('Clock publication failed',String(error)); }
+    try { await this.publish(); }
+    catch(error) {
+      await this.ctx.storage.put('lastError',{at:Date.now(),message:String(error)});
+      console.error('Clock publication failed',String(error));
+    }
   }
 }
 
 function clock(env) {return env.CLOCK.get(env.CLOCK.idFromName('permanent-clock'));}
 
+async function updateComment(env) {
+  if(!env.GITHUB_TOKEN) return;
+  const previous=await env.CLOCK_BUCKET.get('comment-status.json');
+  const status=previous?await previous.json():{};
+  const now=Date.now();
+  if(now<(status.nextAttempt??0)) return;
+  const image=`${env.PUBLIC_R2_URL}/clock.gif?v=${Math.floor(now/1000)}`;
+  const response=await fetch(`https://api.github.com/repos/${env.GITHUB_REPOSITORY}/issues/comments/${env.GITHUB_COMMENT_ID}`,{
+    method:'PATCH',
+    headers:{Authorization:`Bearer ${env.GITHUB_TOKEN}`,'User-Agent':'github-gif-clock','Accept':'application/vnd.github+json','Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},
+    body:JSON.stringify({body:`![Clock](${image})`})
+  });
+  const responseText=await response.text();
+  let payload;
+  try {payload=JSON.parse(responseText);}
+  catch {payload={message:responseText.slice(0,200).replace(/github_pat_[A-Za-z0-9_]+/g,'[redacted]')};}
+  const next=response.ok
+    ?{lastCommentUpdate:now,nextAttempt:now+9000}
+    :{...status,lastError:`GitHub returned ${response.status}: ${payload.message}`,requiredPermissions:response.headers.get('x-accepted-github-permissions'),nextAttempt:now+Math.max(60000,Number(response.headers.get('retry-after')??0)*1000)};
+  await env.CLOCK_BUCKET.put('comment-status.json',JSON.stringify(next),{httpMetadata:{contentType:'application/json',cacheControl:'no-store'}});
+}
+
 export default {
   async scheduled(event,env,ctx) {
     // Watchdog: rearm if an alarm disappears. Does not depend on any viewers.
-    ctx.waitUntil(clock(env).fetch('https://clock.internal/status'));
+    await clock(env).fetch('https://clock.internal/status');
+    // Each scheduled invocation is bounded; Cloudflare starts a new one each minute.
+    for(let i=0;i<6;i++) {
+      if(i) await new Promise(resolve=>setTimeout(resolve,10000));
+      await updateComment(env);
+    }
   },
   async fetch(request,env,ctx) {
     const path=new URL(request.url).pathname;
     if(request.method!=='GET' && request.method!=='HEAD') return new Response('Method not allowed',{status:405});
-    if(path==='/status') return clock(env).fetch('https://clock.internal/status');
+    if(path==='/status') {
+      const response=await clock(env).fetch('https://clock.internal/status');
+      const status=await response.json();
+      const comment=await env.CLOCK_BUCKET.get('comment-status.json');
+      return Response.json({...status,commentUpdater:comment?await comment.json():null,workerGithubUpdatesEnabled:Boolean(env.GITHUB_TOKEN),workerRevision:'scheduled-comment-v1'},{headers:{'Cache-Control':'no-store'}});
+    }
     if(path==='/clock.gif') {
       const object=await env.CLOCK_BUCKET.get('clock.gif');
       if(!object) return new Response('Clock initializing',{status:503});
