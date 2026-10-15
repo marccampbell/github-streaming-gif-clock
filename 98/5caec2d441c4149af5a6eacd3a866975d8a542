@@ -1,0 +1,25 @@
+publish_clock.py
+  s_ef2c4c51d1725f::t_863da1d2658127 7,36,38-39,43-45,56
+server.py
+  s_ef2c4c51d1725f::t_863da1d2658127 5-6,35-49
+README.md
+  s_ef2c4c51d1725f::t_863da1d2658127 20-24
+.gitignore
+  s_ef2c4c51d1725f::t_863da1d2658127 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "985caec2d441c4149af5a6eacd3a866975d8a542",
+  "prompts": {},
+  "sessions": {
+    "s_ef2c4c51d1725f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a13b34-bb21-74b3-8619-976009fcbefe",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Marc Campbell <marc.e.campbell@gmail.com>"
+    }
+  }
+}
